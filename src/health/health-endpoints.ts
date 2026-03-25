@@ -1,6 +1,12 @@
 import { z } from 'zod';
 import { TrelloHealthMonitor, SystemHealthReport, HealthStatus } from './health-monitor.js';
 import { TrelloClient } from '../trello-client.js';
+import {
+  getHiddenDiagnosticsMessage,
+  isDebugModeEnabled,
+  sanitizeDiagnostics,
+  sanitizeErrorMessage,
+} from '../security.js';
 
 /**
  * Health endpoint result structure for MCP tools
@@ -90,7 +96,7 @@ export class TrelloHealthEndpoints {
         content: [
           {
             type: 'text',
-            text: JSON.stringify(healthReport, null, 2),
+            text: JSON.stringify(sanitizeDiagnostics(healthReport), null, 2),
           },
         ],
         isError: healthReport.overall_status === HealthStatus.CRITICAL,
@@ -123,7 +129,7 @@ export class TrelloHealthEndpoints {
         content: [
           {
             type: 'text',
-            text: JSON.stringify(result, null, 2),
+            text: JSON.stringify(sanitizeDiagnostics(result), null, 2),
           },
         ],
         isError: !metadataReport.consistent,
@@ -147,7 +153,7 @@ export class TrelloHealthEndpoints {
         content: [
           {
             type: 'text',
-            text: JSON.stringify(performanceAnalysis, null, 2),
+            text: JSON.stringify(sanitizeDiagnostics(performanceAnalysis), null, 2),
           },
         ],
         isError: performanceAnalysis.status === HealthStatus.CRITICAL,
@@ -192,7 +198,7 @@ export class TrelloHealthEndpoints {
         content: [
           {
             type: 'text',
-            text: JSON.stringify(repairResult, null, 2),
+            text: JSON.stringify(sanitizeDiagnostics(repairResult), null, 2),
           },
         ],
         isError: !repairResult.success,
@@ -493,7 +499,8 @@ export class TrelloHealthEndpoints {
    * Create standardized error response
    */
   private createErrorResponse(message: string, error: unknown): HealthEndpointResult {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorMessage = sanitizeErrorMessage(error, 'Unknown error');
+    const details = isDebugModeEnabled() ? errorMessage : getHiddenDiagnosticsMessage();
 
     return {
       content: [
@@ -502,7 +509,7 @@ export class TrelloHealthEndpoints {
           text: JSON.stringify(
             {
               error: message,
-              details: errorMessage,
+              details,
               timestamp: new Date().toISOString(),
               status: HealthStatus.CRITICAL,
             },

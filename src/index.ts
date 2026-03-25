@@ -4,6 +4,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 import { TrelloClient } from './trello-client.js';
 import { TrelloHealthEndpoints, HealthEndpointSchemas } from './health/health-endpoints.js';
+import { sanitizeErrorMessage } from './security.js';
 
 class TrelloServer {
   private server: McpServer;
@@ -48,7 +49,7 @@ class TrelloServer {
       content: [
         {
           type: 'text' as const,
-          text: `Error: ${error instanceof Error ? error.message : 'Unknown error occurred'}`,
+          text: `Error: ${sanitizeErrorMessage(error)}`,
         },
       ],
       isError: true,
@@ -68,11 +69,15 @@ class TrelloServer {
             .optional()
             .describe('ID of the Trello board (uses default if not provided)'),
           listId: z.string().describe('ID of the Trello list'),
+          fields: z
+            .string()
+            .optional()
+            .describe('Comma-separated list of fields to return (e.g., "name,idShort,labels,due,dueComplete"). Omit for all fields.'),
         },
       },
-      async ({ boardId, listId }) => {
+      async ({ listId, fields }) => {
         try {
-          const cards = await this.trelloClient.getCardsByList(boardId, listId);
+          const cards = await this.trelloClient.getCardsByList(listId, fields);
           return {
             content: [{ type: 'text' as const, text: JSON.stringify(cards, null, 2) }],
           };
@@ -423,7 +428,7 @@ class TrelloServer {
             content: [
               {
                 type: 'text' as const,
-                text: `Error: ${error instanceof Error ? error.message : 'Unknown error occurred'}`,
+                text: `Error: ${sanitizeErrorMessage(error)}`,
               },
             ],
             isError: true,

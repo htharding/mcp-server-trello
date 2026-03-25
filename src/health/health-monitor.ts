@@ -2,6 +2,7 @@ import { TrelloClient } from '../trello-client.js';
 import { AxiosError } from 'axios';
 import { performance } from 'perf_hooks';
 import { RateLimiter } from '../types.js';
+import { isDebugModeEnabled, sanitizeDiagnostics, sanitizeText } from '../security.js';
 
 /**
  * Health status levels for our magnificent Trello organism
@@ -125,8 +126,12 @@ export class TrelloHealthMonitor {
     const report: SystemHealthReport = {
       overall_status: overallStatus,
       timestamp: new Date().toISOString(),
-      checks,
-      recommendations,
+      checks: checks.map(check => ({
+        ...check,
+        message: sanitizeText(check.message),
+        metadata: sanitizeDiagnostics(check.metadata),
+      })),
+      recommendations: sanitizeDiagnostics(recommendations),
       repair_available: this.isRepairAvailable(checks),
       uptime_ms: Date.now() - this.performanceTracker.startTime,
       performance_metrics: this.calculatePerformanceMetrics(),
@@ -533,14 +538,14 @@ export class TrelloHealthMonitor {
     return {
       name: checkName,
       status,
-      message,
+      message: sanitizeText(message),
       duration_ms: Math.round(duration || 0),
       timestamp: new Date().toISOString(),
-      metadata: {
+      metadata: sanitizeDiagnostics({
         error_type: error?.constructor?.name || 'Unknown',
         error_code: errorCode,
-        error_details: error instanceof Error ? error.stack : undefined,
-      },
+        error_details: error instanceof Error && isDebugModeEnabled() ? error.stack : undefined,
+      }),
     };
   }
 

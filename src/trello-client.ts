@@ -23,6 +23,11 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { createReadStream } from 'fs';
 import { fileURLToPath } from 'url';
+import {
+  areLocalFileAttachmentsEnabled,
+  getLocalFileAttachmentDisabledMessage,
+  getLocalFileNotFoundMessage,
+} from './security.js';
 
 // Path for storing active board/workspace configuration
 const CONFIG_DIR = path.join(process.env.HOME || process.env.USERPROFILE || '.', '.trello-mcp');
@@ -251,9 +256,10 @@ export class TrelloClient {
     });
   }
 
-  async getCardsByList(boardId: string | undefined, listId: string): Promise<TrelloCard[]> {
+  async getCardsByList(listId: string, fields?: string): Promise<TrelloCard[]> {
     return this.handleRequest(async () => {
-      const response = await this.axiosInstance.get(`/lists/${listId}/cards`);
+      const params = fields ? { fields } : {};
+      const response = await this.axiosInstance.get(`/lists/${listId}/cards`, { params });
       return response.data;
     });
   }
@@ -459,6 +465,13 @@ export class TrelloClient {
     return this.handleRequest(async () => {
       // Check if fileUrl is a local file path (starts with file://)
       if (fileUrl.startsWith('file://')) {
+        if (!areLocalFileAttachmentsEnabled()) {
+          throw new McpError(
+            ErrorCode.InvalidRequest,
+            getLocalFileAttachmentDisabledMessage()
+          );
+        }
+
         // Handle local file upload
         const localPath = fileURLToPath(fileUrl);
         let effectiveMimeType = mimeType;
@@ -471,7 +484,7 @@ export class TrelloClient {
         try {
           await fs.access(localPath);
         } catch (error) {
-          throw new McpError(ErrorCode.InvalidRequest, `File not found: ${localPath}`);
+          throw new McpError(ErrorCode.InvalidRequest, getLocalFileNotFoundMessage());
         }
 
         // Create form data for multipart upload
