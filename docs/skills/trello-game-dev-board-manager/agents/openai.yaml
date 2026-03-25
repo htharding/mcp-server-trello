@@ -1,4 +1,11 @@
 interface:
   display_name: "Trello Game Dev Board Manager"
   short_description: "Strict game-dev Trello board manager"
-  default_prompt: "Use -game-dev-board-manager to interpret a game development project update, map it to the strict Trello schema, and update the Trello board through the MCP without workflow drift."
+  default_prompt: "Use $trello-game-dev-board-manager to interpret this project update, map it to the strict Trello schema, and update the Trello board through the MCP without workflow drift."
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "trello"
+      description: "Trello MCP server used to read and mutate the board"
+policy:
+  allow_implicit_invocation: true
